@@ -7,6 +7,7 @@ warnings.filterwarnings('ignore')
 from openpyxl import load_workbook
 from openpyxl.styles.alignment import Alignment
 import streamlit as st
+from dateutil.relativedelta import relativedelta
 
 def check_password():
     """Returns `True` if the user had the correct password."""
@@ -39,7 +40,11 @@ def check_password():
 
 def calculate_work_hours(row):
     if pd.isna(row["Keterangan Tidak Hadir"]) and not pd.isna(row["scan_masuk"]) and not pd.isna(row["scan_pulang"]):
-        time_delta = row["scan_pulang"] - row["scan_masuk"]
+        #time_delta = row["scan_pulang"] - row["scan_masuk"]
+        if row["scan_masuk"] < row["Jam Masuk"]:
+            time_delta = row["scan_pulang"] - row["Jam Masuk"]
+        else:
+            time_delta = row["scan_pulang"] - row["scan_masuk"]
         
         hours = time_delta.components.hours
         minutes = time_delta.components.minutes
@@ -51,12 +56,12 @@ def calculate_work_hours(row):
             hours += 0.5
 
         if hours <= 8:
-            jam_kerja = hours
+            jam_normal = hours
             jam_lembur = 0
         elif hours > 8:
-            jam_kerja = 8
+            jam_normal = 8
             jam_lembur = hours - 8
-        return jam_kerja, jam_lembur, td
+        return jam_normal, jam_lembur, td
     else:
         return float('nan'), float('nan'), float('nan')
 
@@ -70,16 +75,18 @@ def calculate_scan_time(row):
     return scan_masuk, scan_pulang
 
 
-def calculate_salary(row):
+def calculate_salary(row,denda_scan_masuk,denda_scan_pulang):
     if  row["Tanggal"].weekday() == 6 or row["is_holiday"] == "Y": # tambahin kondisi kalo hari libur
-        gaji_harian = (row["jam_kerja"]/8) * (float(row["Gaji Harian (Pokok)"])*1.5)
+        gaji_harian = (row["jam_normal"]/8) * (float(row["Gaji Harian (Pokok)"])*1.5)
         gaji_lembur = row["jam_lembur"]* (float(row["Upah Lembur"])*1.5)
     else:    
         
-        gaji_harian = (row["jam_kerja"]/8) * float(row["Gaji Harian (Pokok)"])
+        gaji_harian = (row["jam_normal"]/8) * float(row["Gaji Harian (Pokok)"])
         gaji_lembur = row["jam_lembur"]*float(row["Upah Lembur"])
-    total_gaji_harian = (gaji_harian + gaji_lembur + row["uang_makan_harian"]) - (row["denda_tidak_scan_masuk"]+row["denda_tidak_scan_pulang"])
-    return gaji_harian, gaji_lembur, total_gaji_harian
+    total_denda_harian = (gaji_harian * (row['Tidak Scan Masuk'] == 'Y') * (denda_scan_masuk / 100)) + (gaji_harian * (row['Tidak Scan Pulang'] == 'Y') * (denda_scan_pulang / 100))
+    total_gaji_harian = (gaji_harian + gaji_lembur + row["uang_makan"]) #- total_denda_harian
+    #(row["denda_tidak_scan_masuk"]+row["denda_tidak_scan_pulang"])
+    return gaji_harian, gaji_lembur,total_denda_harian, total_gaji_harian,
 
 def int_to_roman(num):
     values = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1]
@@ -109,7 +116,7 @@ def generate_kwitansi(row):
 
 
     for idx,row in row.iterrows():
-        wb = load_workbook("Template Kwitansi.xlsx")
+        wb = load_workbook("template/template_kwitansi.xlsx")
         sheet = wb.active
 
         #reading specific column
@@ -155,3 +162,51 @@ def check_kedisiplinan(row):
     elif row["Tidak Scan Pulang"] == "Y" or pd.isna(row["scan_pulang"]):
         return "Tidak Scan Pulang"
 
+
+
+def calculate_duration(join_date):
+    today = pd.to_datetime('today')
+    diff = relativedelta(today, join_date)
+    return f"{diff.years} Tahun {diff.months} Bulan {diff.days} Hari"
+
+
+def get_periode(start_date,end_date):
+    
+    month_translation = {
+    1: "Januari",
+    2: "Februari",
+    3: "Maret",
+    4: "April",
+    5: "Mei",
+    6: "Juni",
+    7: "Juli",
+    8: "Agustus",
+    9: "September",
+    10: "Oktober",
+    11: "November",
+    12: "Desember"
+}
+    
+    # start_date = datetime.strptime(start_date, "%Y-%m-%d")
+    # end_date = datetime.strptime(end_date, "%Y-%m-%d")
+
+    # Extract year, month, and day
+    start_day = start_date.day
+    start_month = start_date.month
+    start_year = start_date.year
+
+    end_day = end_date.day
+    end_month = end_date.month
+    end_year = end_date.year
+
+    # Get month names in Indonesian
+    start_month_name = month_translation[start_month]
+    end_month_name = month_translation[end_month]
+
+    # Format the output based on whether dates are in the same month or different months
+    if start_year == end_year and start_month == end_month:
+        # Same month
+        return f"{start_day}-{end_day} {start_month_name} {start_year}"
+    else:
+        # Different months
+        return f"{start_day} {start_month_name} - {end_day} {end_month_name} {end_year}"

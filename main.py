@@ -6,6 +6,8 @@ from pathlib import Path
 import zipfile
 import warnings
 from functions import *
+from slip_gen import *
+from pathlib import Path
 
 from functions import check_password
 warnings.filterwarnings("ignore")
@@ -23,12 +25,36 @@ if check_password():
     with st.sidebar:
         #    st.sidebar.title(":abacus: Mini Payroll System")
 
+        # attendance_data = st.sidebar.file_uploader(
+        #     "**Upload Data Absensi**", type=["xlsx", "xls"]
+        # )
+
+        # start_date = st.date_input("**Start Date**", date.today())
+        # end_date = st.date_input("**End Date**", date.today())
+        
         attendance_data = st.sidebar.file_uploader(
             "**Upload Data Absensi**", type=["xlsx", "xls"]
         )
+        if attendance_data is not None:
+            attendance_data_df = pd.read_excel(attendance_data)
+            attendance_data_df.columns = attendance_data_df.columns.str.lower()
+            attendance_data_df['tanggal'] = pd.to_datetime(attendance_data_df['tanggal'],format='%d-%m-%Y').dt.date
 
-        start_date = st.date_input("**Start Date**", date.today())
-        end_date = st.date_input("**End Date**", date.today())
+            min_date = attendance_data_df['tanggal'].min()
+            max_date = attendance_data_df['tanggal'].max()
+            st.write(attendance_data_df['tanggal'].min(),"-",attendance_data_df['tanggal'].max())
+
+        else:
+            min_date = date.today()
+            max_date = date.today()
+
+        start_date = st.date_input("**Start Date**", min_date,
+                                   min_value=min_date,
+                                   max_value=max_date)
+        
+        end_date = st.date_input("**End Date**", max_date,
+                                   min_value=min_date,
+                                   max_value=max_date)
         st.markdown("""---""")
         employee_master = st.sidebar.file_uploader(
             "**Upload Master Data Pegawai**", type=["xlsx", "xls"]
@@ -36,8 +62,8 @@ if check_password():
         holidays_date = st.sidebar.file_uploader(
             "**Upload Data Libur & Cuti Bersama**", type=["xlsx", "xls"]
         )
-        denda_scan_masuk = st.number_input("**Denda Tidak Scan Masuk**", value=25000)
-        denda_scan_pulang = st.number_input("**Denda Tidak Scan Pulang**", value=25000)
+        denda_scan_masuk = st.number_input("**Denda Tidak Scan Masuk (%)**", value=50, min_value=0, max_value=100)
+        denda_scan_pulang = st.number_input("**Denda Tidak Scan Pulang (%)**", value=50, min_value=0, max_value=100)
         uang_makan = st.number_input("**Uang Makan Harian**", value=15000)
 
 
@@ -57,37 +83,37 @@ if check_password():
         else:
             st.warning("Data Absensi belum di-upload", icon="⚠️")
 
-        emp_master_last_updated = Path("emp_master_last_updated.txt").read_text()
+        emp_master_last_updated = Path("temp_data/emp_master_last_updated.txt").read_text()
         st.write("#### Data Master Pegawai")
         st.write("last update:", emp_master_last_updated)
         if employee_master is not None:
             employee_master_df = pd.read_excel(
                 employee_master, dtype={"Nomor Rekening": str}
             )
-            employee_master_df.to_csv("temp_employee_master.csv", index=None)
-            f = open("emp_master_last_updated.txt", "w")
+            employee_master_df.to_csv("temp_data/temp_employee_master.csv", index=None)
+            f = open("temp_data/emp_master_last_updated.txt", "w")
             f.write(str(datetime.now().strftime("%Y-%m-%d %H:%M")))
             f.close()
             st.write(employee_master_df)
         else:
-            my_file = Path("temp_employee_master.csv")
+            my_file = Path("temp_data/temp_employee_master.csv")
             if my_file.is_file():
                 st.write(pd.read_csv(my_file, dtype={"Nomor Rekening": str}))
             else:
                 st.warning("Data Master Pegawai belum di-upload", icon="⚠️")
 
-        holidays_date_last_updated = Path("holidays_date_last_updated.txt").read_text()
+        holidays_date_last_updated = Path("temp_data/holidays_date_last_updated.txt").read_text()
         st.write("#### Data Libur & Cuti Bersama")
         st.write("last update:", holidays_date_last_updated)
         if holidays_date is not None:
             holidays_date_df = pd.read_excel(holidays_date)
-            holidays_date_df.to_csv("temp_holidays_date.csv", index=None)
-            f = open("holidays_date_last_updated.txt", "w")
+            holidays_date_df.to_csv("temp_data/temp_holidays_date.csv", index=None)
+            f = open("temp_data/holidays_date_last_updated.txt", "w")
             f.write(str(datetime.now().strftime("%Y-%m-%d %H:%M")))
             f.close()
             st.write(holidays_date_df)
         else:
-            my_file = Path("temp_holidays_date.csv")
+            my_file = Path("temp_data/temp_holidays_date.csv")
             if my_file.is_file():
                 st.write(pd.read_csv(my_file))
             else:
@@ -97,9 +123,9 @@ if check_password():
     with tab2:
 
         employee_master_df = pd.read_csv(
-            "temp_employee_master.csv", dtype={"Nomor Rekening": str}
+            "temp_data/temp_employee_master.csv", dtype={"Nomor Rekening": str}
         )
-        holidays_date_df = pd.read_csv("temp_holidays_date.csv")
+        holidays_date_df = pd.read_csv("temp_data/temp_holidays_date.csv")
         st.markdown(" \n\n")
         # st.write("Klik tombol dibawah untuk hitung gaji & generate kwitansi")
 
@@ -130,13 +156,18 @@ if check_password():
                             "Nama Bank",
                             "Nama Akun Bank",
                             "Nomor Rekening",
+                            "Jam Masuk",
+                            "Jabatan",
+                            "Tanggal Join"
                         ]
                     ],
                     left_on="NIP",
                     right_on="PIN/ID",
                     how="left",
                 )
-                
+                absensi_emp_master["Jam Masuk"] = pd.to_datetime(
+                        absensi_emp_master["Jam Masuk"], format="%H:%M:%S"
+                    )
                 #absensi_emp_master = absensi_emp_master[absensi_emp_master["Keterangan Tidak Hadir"].isnull()]
                 
                 absensi_emp_master["Tanggal"] = pd.to_datetime(
@@ -146,7 +177,16 @@ if check_password():
                     holidays_date_df["Tanggal Libur"]
                 )
                 # get holiday flag
-                absensi_emp_master["weekday"] = absensi_emp_master["Tanggal"].dt.day_name()
+                haris_mapping = {
+                "Monday": "Senin",
+                "Tuesday": "Selasa",
+                "Wednesday": "Rabu",
+                "Thursday": "Kamis",
+                "Friday": "Jumat",
+                "Saturday": "Sabtu",
+                "Sunday": "Minggu"
+                }
+                absensi_emp_master["hari"] = absensi_emp_master["Tanggal"].dt.day_name().map(haris_mapping)
 
                 absensi_emp_master = absensi_emp_master.merge(
                     holidays_date_df,
@@ -192,36 +232,50 @@ if check_password():
                 ] = pekerja_harian.apply(calculate_scan_time, axis=1, result_type="expand")
               
                 # daily worker early scan (before 8AM)
+                # pekerja_harian["scan_masuk"] = pekerja_harian["scan_masuk"].apply(
+                #     lambda x: pd.to_datetime(pekerja_harian["Jam Masuk"], format='%I:%M:%S %p')
+                #     if x <= pd.Timestamp("1900-01-01T08")
+                #     else x
+                # )
                 pekerja_harian["scan_masuk"] = pekerja_harian["scan_masuk"].apply(
-                    lambda x: pd.Timestamp("1900-01-01T08")
-                    if x <= pd.Timestamp("1900-01-01T08")
+                    lambda x: pd.to_datetime(pekerja_harian["Jam Masuk"], format='%I:%M:%S %p').iloc[0]
+                    if x <= pd.to_datetime(pekerja_harian["Jam Masuk"], format='%I:%M:%S %p').iloc[0]  # using an example element
                     else x
                 )
 
                 # get denda and uang makan
-                pekerja_harian["denda_tidak_scan_masuk"] = pekerja_harian[
-                    "Tidak Scan Masuk"
-                ].apply(lambda x: denda_scan_masuk if x == "Y" else 0)
-                pekerja_harian["denda_tidak_scan_pulang"] = pekerja_harian[
-                    "Tidak Scan Pulang"
-                ].apply(lambda x: denda_scan_masuk if x == "Y" else 0)
-                pekerja_harian["uang_makan_harian"] = pekerja_harian["Uang Makan"].apply(
+                # pekerja_harian["denda_tidak_scan_masuk"] = pekerja_harian[
+                #     "Tidak Scan Masuk"
+                # ].apply(lambda x: denda_scan_masuk if x == "Y" else 0)
+                # pekerja_harian["denda_tidak_scan_pulang"] = pekerja_harian[
+                #     "Tidak Scan Pulang"
+                # ].apply(lambda x: denda_scan_pulang if x == "Y" else 0)
+                #st.write(pekerja_harian)
+                
+                
+                pekerja_harian['Tanggal Join'] = pd.to_datetime(pekerja_harian['Tanggal Join'])
+                pekerja_harian['masa_kerja'] = pekerja_harian['Tanggal Join'].apply(calculate_duration)
+                
+                pekerja_harian["uang_makan"] = pekerja_harian["Uang Makan"].apply(
                     lambda x: uang_makan if x == "Y" else 0
                 )
                 
                 # calculate working hours
                 pekerja_harian[
-                    ["jam_kerja", "jam_lembur", "timedelta"]
+                    ["jam_normal", "jam_lembur", "timedelta"]
                 ] = pekerja_harian.apply(calculate_work_hours, axis=1, result_type="expand")
       
-                pekerja_harian[
-                    ["gaji_harian", "gaji_lembur", "total_gaji_harian"]
-                ] = pekerja_harian.apply(calculate_salary, axis=1, result_type="expand")
-
+                pekerja_harian[["gaji_normal", "gaji_lembur","total_denda", "total_gaji"]] = pekerja_harian.apply(
+                lambda row: calculate_salary(row, denda_scan_masuk, denda_scan_pulang),
+                axis=1,
+                result_type="expand")
+                pekerja_harian["Kasbon"] = pekerja_harian["Kasbon"].fillna(0)
+                pekerja_harian["total_gaji_harian"] = pekerja_harian["total_gaji"] - (pekerja_harian["total_denda"]+pekerja_harian["Kasbon"] )
+                
                 total_gaji_df = (
                     pekerja_harian.groupby("NIP")
-                    .agg({"total_gaji_harian": "sum","Kasbon": "sum"})
-                    .rename(columns={"total_gaji_harian": "gaji_final_sebelum_kasbon","Kasbon": "total_kasbon"})
+                    .agg({"total_gaji": "sum","Kasbon": "sum"})
+                    .rename(columns={"total_gaji": "gaji_final_sebelum_kasbon","Kasbon": "total_kasbon"})
                     .reset_index()
                 )
                 gaji_pekerja_harian_details = pd.merge(
@@ -238,10 +292,47 @@ if check_password():
                 kolom_scan+=["scan_masuk","scan_pulang"]
                 df_ph_details[kolom_scan] = df_ph_details[kolom_scan].apply(lambda x: pd.to_datetime(x).dt.strftime('%H:%M:%S'))
                 df_ph_details[["Tanggal"]] = df_ph_details[["Tanggal"]].apply(lambda x: pd.to_datetime(x).dt.strftime('%d-%m-%Y'))
-
+                
+                gaji_final_df = df_ph_details.groupby("NIP").agg(
+                    total_gaji_final=("total_gaji_harian", "sum")
+                ).reset_index()
+                
+                df_ph_details = pd.merge(
+                    df_ph_details, gaji_final_df, on="NIP", how="left"
+                )
+                
+                summary_ket_slip_gaji = df_ph_details.groupby("NIP").agg(
+                            ket_tidak_scan_masuk=("Tidak Scan Masuk", lambda x: (x == "Y").sum()),
+                            ket_tidak_scan_pulang=("Tidak Scan Pulang", lambda x: (x == "Y").sum()),
+                            ket_tidak_masuk=("Keterangan Tidak Hadir", lambda x: x.notna().sum()),  # Count non-null values
+                            ket_hari_lembur=("jam_lembur", lambda x: (x > 0).sum()), 
+                            ket_jam_lembur=("jam_lembur", "sum")  # Sum overtime hours
+                        ).reset_index()
+                
+                summary_ket_slip_gaji["ket_tidak_absen"] = summary_ket_slip_gaji["ket_tidak_scan_masuk"] + summary_ket_slip_gaji["ket_tidak_scan_pulang"]
+                
+                summary_ket_slip_gaji_final = pd.merge(
+                    summary_ket_slip_gaji,pekerja_harian[["NIP","Jabatan","masa_kerja","Nama Bank","Nama Akun Bank", "Nomor Rekening"]], on="NIP", how="left"
+                )
+                
+                
+                
+                df_slip_gaji_1 = df_ph_details[["NIP","Nama","Tanggal","hari","is_holiday","scan_masuk","scan_pulang","jam_normal","jam_lembur",
+                                            "gaji_normal","gaji_lembur","uang_makan","total_gaji","total_denda",
+                                        "Kasbon","total_gaji_harian","total_gaji_final"]]
+                
+                detail_slip_gaji = pd.merge(
+                    df_slip_gaji_1, summary_ket_slip_gaji_final, on="NIP", how="left"
+                ).drop_duplicates()
                 
                 st.markdown("### Detail Gaji Pekerja Harian (preview)")
                 st.dataframe(df_ph_details)
+                
+                periode = get_periode(start_date,end_date)
+                generate_salary_slip(detail_slip_gaji,periode)
+                
+                st.markdown("### Gaji Pekerja Harian Summary (Slip Gaji)")
+                st.dataframe(detail_slip_gaji)
 
 
                 ph_list_nip = df_ph_details["NIP"].drop_duplicates().values.tolist()
@@ -257,7 +348,7 @@ if check_password():
                     
                     #locate the is_holiday column
                     column_header_1 = "is_holiday"
-                    column_header_2 = "weekday"
+                    column_header_2 = "hari"
                     fill_color = "FF0000"
 
                     # Find the coordinate of the column header name
@@ -321,6 +412,7 @@ if check_password():
 
                 file_list.append("kwitansi_output/" + "detail_kwitansi.xlsx")
                 file_list.append("kwitansi_output/" + "detail_perhitungan_gaji.xlsx")
+                file_list.append("kwitansi_output/slip_gaji_"+periode+".xlsx")
                 file_list+=ph_list_filename
                 with zipfile.ZipFile(
                     "kwitansi_output/"
@@ -376,9 +468,9 @@ if check_password():
         if btnGenerateReportWH:
             with st.spinner("Loading...."):
                 master_emp = pd.read_csv(
-                    "temp_employee_master.csv", dtype={"Nomor Rekening": str}
+                    "temp_data/temp_employee_master.csv", dtype={"Nomor Rekening": str}
                 )
-                holidays_date_df = pd.read_csv("temp_holidays_date.csv")
+                holidays_date_df = pd.read_csv("temp_data/temp_holidays_date.csv")
                 absensi_emp_master = attendance_data_df.merge(
                                     master_emp[
                                         [
@@ -396,7 +488,19 @@ if check_password():
                 holidays_date_df["Tanggal Libur"] = pd.to_datetime(
                                     holidays_date_df["Tanggal Libur"]
                                 )
-                absensi_emp_master["weekday"] = absensi_emp_master["Tanggal"].dt.day_name()
+                haris_mapping = {
+                "Monday": "Senin",
+                "Tuesday": "Selasa",
+                "Wednesday": "Rabu",
+                "Thursday": "Kamis",
+                "Friday": "Jumat",
+                "Saturday": "Sabtu",
+                "Sunday": "Minggu"
+                }
+                absensi_emp_master["hari"] = absensi_emp_master["Tanggal"].dt.day_name().map(haris_mapping)
+
+                
+            
 
                 absensi_emp_master = absensi_emp_master.merge(
                                     holidays_date_df,
@@ -438,13 +542,13 @@ if check_password():
                 # daily worker early scan (before 9AM)
 
 
-                absensi_emp_master[["jam_kerja", "jam_lembur", "timedelta"]] = absensi_emp_master.apply(calculate_work_hours, axis=1, result_type="expand")
+                absensi_emp_master[["jam_normal", "jam_lembur", "timedelta"]] = absensi_emp_master.apply(calculate_work_hours, axis=1, result_type="expand")
 
                 absensi_emp_master["kedisiplinan"] = absensi_emp_master.apply(check_kedisiplinan, axis=1, result_type="expand")
 
-                absensi_emp_master["total_jam_kerja"] = absensi_emp_master["jam_kerja"] + absensi_emp_master["jam_lembur"] 
+                absensi_emp_master["total_jam_normal"] = absensi_emp_master["jam_normal"] + absensi_emp_master["jam_lembur"] 
                 
-                output = absensi_emp_master[["NIP","Nama","Keterangan","weekday","Tanggal","scan_masuk","scan_pulang","jam_kerja","jam_lembur","total_jam_kerja","kedisiplinan"]]
+                output = absensi_emp_master[["NIP","Nama","Keterangan","hari","Tanggal","scan_masuk","scan_pulang","jam_normal","jam_lembur","total_jam_normal","kedisiplinan"]]
 
                 output.sort_values(['NIP', 'Tanggal'], inplace=True)
                 st.markdown("### Detail Total Jam Kerja")
