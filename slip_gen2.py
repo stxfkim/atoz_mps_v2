@@ -24,16 +24,18 @@ def generate_salary_slip(df,periode):
     if current_date.day == 1:
         last_count=0
     # Copy template to new file
-    wb = load_workbook(Path('template/template_slip_gaji.xlsx'))
+    
 
     # Get the template sheet
-    template_sheet = wb["tmp"]
+    
 
     # Get unique NIPs
     unique_nips = df["NIP"].unique()
-
+    slips_list_filename = []
     # Process each NIP
     for nip in unique_nips:
+        wb = load_workbook(Path('template/template_slip_gaji.xlsx'))
+        template_sheet = wb["tmp"]
         emp_df = df[df["NIP"] == nip]  # Filter data for the NIP
         emp_name = emp_df["Nama"].iloc[0]
 
@@ -41,6 +43,7 @@ def generate_salary_slip(df,periode):
         sheet_name = f"{emp_name}_{nip}"  # Shorten name for sheet
         new_sheet = wb.copy_worksheet(template_sheet)
         new_sheet.title = sheet_name
+        wb.remove(template_sheet)
 
         # Insert Employee Information
         new_sheet["B7"].value = emp_name
@@ -85,14 +88,13 @@ def generate_salary_slip(df,periode):
                     new_sheet[f"{get_column_letter(col)}{start_row}"].fill = PatternFill(start_color="FF9999", fill_type="solid")
 
             start_row += 1
+        
+        file_output = Path("kwitansi_output/Slip gaji_"+emp_name+".xlsx")
+        wb.save(file_output)
+        slips_list_filename.append(file_output)
 
     with open("last_count.txt", "w") as file:
         file.write(str(last_count))
+    
+    return slips_list_filename
 
-    # Remove the template sheet
-    wb.remove(template_sheet)
-
-    file_output = Path("kwitansi_output/slip_gaji_"+periode+".xlsx")
-    # Save the final file
-    wb.save(file_output)
-    print(f"Excel file has been created: {file_output}")

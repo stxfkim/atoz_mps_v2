@@ -6,7 +6,7 @@ from pathlib import Path
 import zipfile
 import warnings
 from functions import *
-from slip_gen import *
+from slip_gen2 import *
 from pathlib import Path
 
 from functions import check_password
@@ -41,20 +41,22 @@ if check_password():
             attendance_data_df['tanggal'] = pd.to_datetime(attendance_data_df['tanggal'],format='%d-%m-%Y').dt.date
 
             min_date = attendance_data_df['tanggal'].min()
-            max_date = attendance_data_df['tanggal'].max()
+            #max_date = attendance_data_df['tanggal'].max()
+            max_14_days = min_date + pd.Timedelta(days=14)
             st.write(attendance_data_df['tanggal'].min(),"-",attendance_data_df['tanggal'].max())
 
         else:
             min_date = date.today()
-            max_date = date.today()
+            #max_date = date.today()
+            max_14_days = min_date + pd.Timedelta(days=14)
 
         start_date = st.date_input("**Start Date**", min_date,
                                    min_value=min_date,
-                                   max_value=max_date)
+                                   max_value=max_14_days)
         
-        end_date = st.date_input("**End Date**", max_date,
+        end_date = st.date_input("**End Date**", max_14_days,
                                    min_value=min_date,
-                                   max_value=max_date)
+                                   max_value=max_14_days)
         st.markdown("""---""")
         employee_master = st.sidebar.file_uploader(
             "**Upload Master Data Pegawai**", type=["xlsx", "xls"]
@@ -328,13 +330,16 @@ if check_password():
                 st.markdown("### Detail Gaji Pekerja Harian (preview)")
                 st.dataframe(df_ph_details)
                 
-                periode = get_periode(start_date,end_date)
-                generate_salary_slip(detail_slip_gaji,periode)
+                
                 
                 st.markdown("### Gaji Pekerja Harian Summary (Slip Gaji)")
                 st.dataframe(detail_slip_gaji)
 
-
+                
+                
+                
+                
+                
                 ph_list_nip = df_ph_details["NIP"].drop_duplicates().values.tolist()
                 ph_list_filename = []
                 for idx in range(len(ph_list_nip)):
@@ -399,7 +404,10 @@ if check_password():
                     " ", "_", regex=True
                 )
                 file_list = generate_kwitansi(df_kwitansi)
-
+                periode = get_periode(start_date,end_date)
+                slips_list_filename = generate_salary_slip(detail_slip_gaji,periode)
+                
+                #st.write(slips_list_filename)
                 
                 st.markdown("### Detail Kwitansi")
                 st.write(df_kwitansi)
@@ -412,8 +420,9 @@ if check_password():
 
                 file_list.append("kwitansi_output/" + "detail_kwitansi.xlsx")
                 file_list.append("kwitansi_output/" + "detail_perhitungan_gaji.xlsx")
-                file_list.append("kwitansi_output/slip_gaji_"+periode+".xlsx")
+                #file_list.append("kwitansi_output/slip_gaji_"+periode+".xlsx")
                 file_list+=ph_list_filename
+                file_list+=slips_list_filename
                 with zipfile.ZipFile(
                     "kwitansi_output/"
                     + "Kwitansi_"
