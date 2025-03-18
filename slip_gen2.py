@@ -53,10 +53,10 @@ def generate_salary_slip(df,periode):
         new_sheet["G8"].value = emp_df["Nama Akun Bank"].iloc[0]
         new_sheet["G9"].value = emp_df["Nomor Rekening"].iloc[0]
         
-        new_sheet["B35"].value = emp_df["ket_tidak_masuk"].iloc[0]
-        new_sheet["B36"].value = emp_df["ket_hari_lembur"].iloc[0]
-        new_sheet["B37"].value = emp_df["ket_jam_lembur"].iloc[0]
-        new_sheet["B38"].value = emp_df["ket_tidak_absen"].iloc[0]
+        new_sheet["B45"].value = emp_df["ket_tidak_masuk"].iloc[0]
+        new_sheet["B46"].value = emp_df["ket_hari_lembur"].iloc[0]
+        new_sheet["B47"].value = emp_df["ket_jam_lembur"].iloc[0]
+        new_sheet["B48"].value = emp_df["ket_tidak_absen"].iloc[0]
         new_sheet["I7"].value = emp_df["total_gaji_final"].iloc[0]
         new_sheet["A3"].value = "Periode: "+periode
         
