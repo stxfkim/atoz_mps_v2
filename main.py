@@ -41,7 +41,7 @@ if check_password():
             attendance_data_df['tanggal'] = pd.to_datetime(attendance_data_df['tanggal'],format='%d-%m-%Y').dt.date
 
             min_date = attendance_data_df['tanggal'].min()
-            #max_date = attendance_data_df['tanggal'].max()
+            max_date = attendance_data_df['tanggal'].max()
             max_14_days = min_date + pd.Timedelta(days=14)
             st.write(attendance_data_df['tanggal'].min(),"-",attendance_data_df['tanggal'].max())
 
