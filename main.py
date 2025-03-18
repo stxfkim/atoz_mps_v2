@@ -47,16 +47,16 @@ if check_password():
 
         else:
             min_date = date.today()
-            #max_date = date.today()
-            max_14_days = min_date + pd.Timedelta(days=14)
+            max_date = date.today()
+            #max_14_days = min_date + pd.Timedelta(days=14)
 
         start_date = st.date_input("**Start Date**", min_date,
                                    min_value=min_date,
-                                   max_value=max_14_days)
+                                   max_value=max_date)
         
-        end_date = st.date_input("**End Date**", max_14_days,
+        end_date = st.date_input("**End Date**", max_date,
                                    min_value=min_date,
-                                   max_value=max_14_days)
+                                   max_value=max_date)
         st.markdown("""---""")
         employee_master = st.sidebar.file_uploader(
             "**Upload Master Data Pegawai**", type=["xlsx", "xls"]
