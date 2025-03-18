@@ -83,9 +83,9 @@ def calculate_salary(row,denda_scan_masuk,denda_scan_pulang):
         
         gaji_harian = (row["jam_normal"]/8) * float(row["Gaji Harian (Pokok)"])
         gaji_lembur = row["jam_lembur"]*float(row["Upah Lembur"])
-    total_denda_harian = (gaji_harian * (row['Tidak Scan Masuk'] == 'Y') * (denda_scan_masuk / 100)) + (gaji_harian * (row['Tidak Scan Pulang'] == 'Y') * (denda_scan_pulang / 100))
+    total_denda_harian = ((gaji_harian+ gaji_lembur) * (row['Tidak Scan Masuk'] == 'Y') * (denda_scan_masuk / 100)) + ((gaji_harian+ gaji_lembur) * (row['Tidak Scan Pulang'] == 'Y') * (denda_scan_pulang / 100))
     total_gaji_harian = (gaji_harian + gaji_lembur + row["uang_makan"]) #- total_denda_harian
-    #(row["denda_tidak_scan_masuk"]+row["denda_tidak_scan_pulang"])
+    
     return gaji_harian, gaji_lembur,total_denda_harian, total_gaji_harian,
 
 def int_to_roman(num):
